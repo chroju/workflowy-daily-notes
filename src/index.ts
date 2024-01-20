@@ -66,6 +66,9 @@ export default {
 				return new Response('Not found', { status: 404 });
 		}
 	},
+	async scheduled(event: Event, env: Env, ctx: ExecutionContext) {
+		ctx.waitUntil(createDailyNote(env));
+	},
 };
 
 async function validateRequest(request: Request, env: Env) {

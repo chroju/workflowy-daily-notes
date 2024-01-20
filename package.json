@@ -1,0 +1,21 @@
+{
+  "name": "workflowy-daily-notes",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240117.0",
+    "typescript": "^5.0.4",
+    "webpack-cli": "^5.1.4",
+    "wrangler": "^3.0.0"
+  },
+  "dependencies": {
+    "@types/uuid": "^9.0.7",
+    "form-data-encoder": "^4.0.2",
+    "zod": "^3.22.4"
+  }
+}

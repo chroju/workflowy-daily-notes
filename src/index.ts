@@ -49,6 +49,11 @@ const requestSchema = z.object({
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		const res = await validateRequest(request, env);
+		if (res !== null) {
+			return res;
+		}
+
 		const path = new URL(request.url).pathname;
 		switch (path) {
 			case '/':
@@ -56,14 +61,14 @@ export default {
 			case '/send':
 				return send(request, env);
 			case '/daily':
-				return createDailyNote(request, env);
+				return createDailyNote(env);
 			default:
 				return new Response('Not found', { status: 404 });
 		}
 	},
 };
 
-async function createDailyNote(request: Request, env: Env) {
+async function validateRequest(request: Request, env: Env) {
 	if (request.method !== 'POST') {
 		return new Response('Method not allowed', { status: 405 });
 	}
@@ -73,6 +78,10 @@ async function createDailyNote(request: Request, env: Env) {
 		return new Response('Unauthorized', { status: 401 });
 	}
 
+	return null;
+}
+
+async function createDailyNote(env: Env) {
 	const sessionId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.SESSION_ID);
 	if (sessionId === null) {
 		return new Response('Session ID not found', { status: 403 });
@@ -105,15 +114,6 @@ async function createDailyNote(request: Request, env: Env) {
 }
 
 async function send(request: Request, env: Env) {
-	if (request.method !== 'POST') {
-		return new Response('Method not allowed', { status: 405 });
-	}
-
-	const token = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.TOKEN);
-	if (request.headers.get('Authorization') !== `Bearer ${token}`) {
-		return new Response('Unauthorized', { status: 401 });
-	}
-
 	const sessionId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.SESSION_ID);
 	if (sessionId === null) {
 		return new Response('Session ID not found', { status: 403 });

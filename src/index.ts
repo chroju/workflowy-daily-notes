@@ -1,4 +1,5 @@
 import { init, createBullet, CreateBulletProps } from './workflowy';
+import { html } from './html';
 import { z } from 'zod';
 /**
  * Welcome to Cloudflare Workers! This is your first worker.
@@ -49,18 +50,20 @@ const requestSchema = z.object({
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		const res = await validateRequest(request, env);
-		if (res !== null) {
-			return res;
-		}
-
 		const path = new URL(request.url).pathname;
+		const res = await validateRequest(request, env);
 		switch (path) {
 			case '/':
-				return new Response('Hello world!');
+				return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 			case '/send':
+				if (res !== null) {
+					return res;
+				}
 				return send(request, env);
 			case '/daily':
+				if (res !== null) {
+					return res;
+				}
 				return createDailyNote(env);
 			default:
 				return new Response('Not found', { status: 404 });

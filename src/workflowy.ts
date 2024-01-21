@@ -87,6 +87,10 @@ export async function createBullet(props: CreateBulletProps) {
 				Cookie: `sessionid=${props.sessionId}`,
 			},
 		});
+		if (response.status !== 200) {
+			throw new Error('${response.status} ${response.statusText}');
+		}
+		console.log(response);
 		return projectid;
 	} catch (err) {
 		console.error(err);

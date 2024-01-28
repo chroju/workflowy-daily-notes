@@ -102,6 +102,7 @@ async function createDailyNote(env: Env) {
 
 	// Get current date string (e.g. 2024-01-20)
 	const date = new Date();
+	date.setDate(date.getDate() + 1);
 	const dateString = date.toISOString().split('T')[0];
 
 	const props: CreateBulletProps = {

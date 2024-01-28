@@ -3,6 +3,7 @@ export const html = `
 <html>
 <head>
 	<title>Workflowy Daily Notes</title>
+	<meta content="width=device-width,initial-scale=1,shrink-to-fit=no,viewport-fit=cover,interactive-widget=resizes-content" name="viewport">
   <style>
     body, html {
       margin: 0;
@@ -16,29 +17,29 @@ export const html = `
     textarea {
       flex-grow: 1;
       width: 100%;
-      padding: 28%; /* Adjusted for mobile view */
+      padding: 30px;
       border: none;
       color: #ECEFF4;
       background: #2e3440;
       resize: none;
-      font-size: 4vh; /* Adjusted for mobile view */
+      font-size: 16px;
       /* font is serif for Japanese characters */
       font-family: Hiragino Mincho ProN, Yu Mincho, serif;
     }
 
     #submitButton, #settingButton {
       position: fixed;
-      bottom: 5%;
-      padding: 10% 0; /* Increased padding for easier clicking */
+			bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
+      padding: 3% 0; /* Increased padding for easier clicking */
       border: none;
       border-radius: 10px;
-      font-size: 4vh; /* Adjusted for mobile view */
+      font-size: 14px; /* Adjusted for mobile view */
       color: #d8dee9;
       background: transparent;
       border: #4c566a solid 1px;
       cursor: pointer;
       transition: filter 0.5s; /* Transition effect */
-      width: 45%; /* Adjusted width for two buttons */
+      width: 40%; /* Adjusted width for two buttons */
     }
 
     #submitButton:hover, #settingButton:hover {
@@ -46,12 +47,12 @@ export const html = `
     }
 
     #submitButton {
-      right: 5%;
+      right: 20px;
       background: #434C5E;
     }
 
     #settingButton {
-      left: 5%;
+      left: 20px;
     }
 
     .active { /* Button color change upon clicking */
@@ -103,7 +104,7 @@ export const html = `
       box-sizing: border-box;
     }
 
-    @media (min-width: 768px) {
+    @media (min-width: 1240px) {
       textarea {
         padding: 50px;
         font-size: 1.5em; /* Larger font size for desktop view */
@@ -150,6 +151,12 @@ export const html = `
     const settingModal = document.getElementById ('settingModal');
     const closeSpan = document.getElementsByClassName('close')[0];
 
+    let bearerToken = localStorage.getItem('bearerToken') || '';
+
+    window.onload = function() {
+      tokenInput.value = bearerToken;
+    }
+
     // When the user clicks on the button, open the modal
     settingButton.onclick = function() {
       settingModal.style.display = "block";
@@ -169,10 +176,9 @@ export const html = `
 
     saveButton.addEventListener('click', function() {
       localStorage.setItem('bearerToken', tokenInput.value);
+      bearerToken = tokenInput.value;
       settingModal.style.display = "none";
     });
-
-    const bearerToken = localStorage.getItem('bearerToken') || '';
 
     submitButton.addEventListener('click', function() {
       // Change button to loading state
@@ -189,7 +195,6 @@ export const html = `
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
-         return response.json();
       }).then(data => {
         // Handle response data
         showAlert('Success', true);
@@ -199,6 +204,7 @@ export const html = `
       }).finally(() => {
         submitButton.innerHTML = 'Submit';
         submitButton.disabled = false;
+				textarea.value = '';
       });
     });
 

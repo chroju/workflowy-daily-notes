@@ -51,7 +51,7 @@ const requestSchema = z.object({
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const path = new URL(request.url).pathname;
-		const res = await validateRequest(request, env);
+		const res = await validatePostRequest(request, env);
 		switch (path) {
 			case '/':
 				return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
@@ -62,7 +62,7 @@ export default {
 				return send(request, env);
 			case '/daily':
 				if (res !== null) {
-					return res;
+					return getDailyNote(env);
 				}
 				return createDailyNote(env);
 			default:
@@ -74,7 +74,7 @@ export default {
 	},
 };
 
-async function validateRequest(request: Request, env: Env) {
+async function validatePostRequest(request: Request, env: Env) {
 	if (request.method !== 'POST') {
 		return new Response('Method not allowed', { status: 405 });
 	}
@@ -85,6 +85,18 @@ async function validateRequest(request: Request, env: Env) {
 	}
 
 	return null;
+}
+
+async function getDailyNote(env: Env) {
+	const dailyNoteId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.DAILY_NOTE_ID);
+	if (dailyNoteId === null) {
+		return new Response('Daily note ID not found', { status: 404 });
+	}
+
+	const dailyNotePath = dailyNoteId.split('-').pop();
+	const dailyNoteURL = `https://workflowy.com/#/${dailyNotePath}`;
+
+	return new Response('', { status: 302, headers: { Location: dailyNoteURL } });
 }
 
 async function createDailyNote(env: Env) {

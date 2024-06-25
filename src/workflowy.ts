@@ -1,4 +1,5 @@
 import { InitData, ResultD } from './data';
+import { getTitleFromUrl, isValidHttpUrl } from './utils';
 
 const CLIENT_VERSION = '23';
 const WORKFLOWY_URL = {

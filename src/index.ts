@@ -1,6 +1,7 @@
 import { init, createBullet, CreateBulletProps } from './workflowy';
 import { html } from './html';
 import { z } from 'zod';
+import { getTitleFromUrl, isValidHttpUrl } from './utils';
 /**
  * Welcome to Cloudflare Workers! This is your first worker.
  *
@@ -146,6 +147,13 @@ async function send(request: Request, env: Env) {
 
 	try {
 		const req = requestSchema.parse(await request.json());
+
+		if (isValidHttpUrl(req.text)) {
+			const title = await getTitleFromUrl(req.text);
+			if (title) {
+				req.text = `${title} ${req.text}`;
+			}
+		}
 		req.text = `${req.text} #inbox`;
 
 		if (req.useTimestamp) {

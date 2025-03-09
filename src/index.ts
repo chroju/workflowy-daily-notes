@@ -113,11 +113,24 @@ async function createDailyNote(env: Env) {
 
 	const initData = await init(sessionId);
 
-	// Get current date string (e.g. 2024-01-20)
-	const date = new Date();
-	date.setDate(date.getDate() + 1);
-	const dateStrings = date.toUTCString().split(' ');
-	const dateString = dateStrings[0] + ' ' + dateStrings[2] + ' ' + date.getUTCDate() + ', ' + dateStrings[3] + ' ';
+	// Get current date (Monday) and next Sunday date in YYYY/MM/DD format
+	const currentDate = new Date();
+	// Format current date as YYYY/MM/DD
+	const currentDateFormatted = `${currentDate.getFullYear()}/${String(currentDate.getMonth() + 1).padStart(2, '0')}/${String(
+		currentDate.getDate()
+	).padStart(2, '0')}`;
+
+	// Calculate next Sunday (current date + days until next Sunday)
+	const nextSunday = new Date(currentDate);
+	const daysUntilSunday = 7 - currentDate.getDay();
+	nextSunday.setDate(currentDate.getDate() + daysUntilSunday);
+	// Format next Sunday as YYYY/MM/DD
+	const nextSundayFormatted = `${nextSunday.getFullYear()}/${String(nextSunday.getMonth() + 1).padStart(2, '0')}/${String(
+		nextSunday.getDate()
+	).padStart(2, '0')}`;
+
+	// Create the date range string
+	const dateString = `${currentDateFormatted}-${nextSundayFormatted} `;
 
 	const props: CreateBulletProps = {
 		sessionId: sessionId,

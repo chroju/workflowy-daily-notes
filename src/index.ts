@@ -148,7 +148,7 @@ async function send(request: Request, env: Env) {
 	try {
 		const req = requestSchema.parse(await request.json());
 
-		if (isValidHttpUrl(req.text)) {
+		if (isValidHttpUrl(req.text) && 'x.com' !== new URL(req.text).hostname) {
 			const title = await getTitleFromUrl(req.text);
 			if (title) {
 				req.text = `${title} ${req.text}`;

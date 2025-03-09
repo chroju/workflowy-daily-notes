@@ -34,6 +34,7 @@ const KV_KEYS = {
 	JOURNAL_ROOT_ID: 'journalRootId',
 	WEEKLY_NOTE_ID: 'weeklyNoteId',
 	SESSION_ID: 'sessionId',
+	PENDING_BULLET: 'pending_bullet', // 処理待ちのバレット情報
 };
 
 interface parsedRequest {
@@ -60,7 +61,7 @@ export default {
 				if (res !== null) {
 					return res;
 				}
-				return send(request, env);
+				return send(request, env, ctx);
 			case '/weekly':
 				if (res !== null) {
 					return getWeeklyNote(env);
@@ -147,52 +148,116 @@ async function createWeeklyNote(env: Env) {
 	return new Response('Created weekly note', { status: 200 });
 }
 
-async function send(request: Request, env: Env) {
-	const sessionId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.SESSION_ID);
-	if (sessionId === null) {
-		return new Response('Session ID not found', { status: 403 });
-	}
-
-	const parentId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.WEEKLY_NOTE_ID);
-	if (parentId === null) {
-		return new Response('Weekly note ID not found', { status: 403 });
-	}
-
+async function send(request: Request, env: Env, ctx: ExecutionContext) {
+	// リクエストのJSONをパースする処理だけは同期的に行う
+	let reqBody;
 	try {
-		const req = requestSchema.parse(await request.json());
+		reqBody = await request.json();
+	} catch (err) {
+		return new Response('Invalid JSON', { status: 400 });
+	}
 
-		if (isValidHttpUrl(req.text) && 'x.com' !== new URL(req.text).hostname) {
-			const title = await getTitleFromUrl(req.text);
+	// 残りの処理はすべて非同期で実行
+	ctx.waitUntil(processRequest(reqBody, env));
+
+	// 即座に成功レスポンスを返す
+	return new Response('Request accepted', { status: 200 });
+}
+
+// 非同期で実行される処理
+async function processRequest(reqBody: any, env: Env) {
+	try {
+		// リクエストのバリデーション
+		const req = requestSchema.parse(reqBody);
+
+		// セッションIDの取得
+		const sessionId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.SESSION_ID);
+		if (sessionId === null) {
+			console.error('Session ID not found');
+			return;
+		}
+
+		// 親IDの取得
+		const parentId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.WEEKLY_NOTE_ID);
+		if (parentId === null) {
+			console.error('Weekly note ID not found');
+			return;
+		}
+
+		// URLからタイトルを取得
+		let text = req.text;
+		if (isValidHttpUrl(text) && 'x.com' !== new URL(text).hostname) {
+			const title = await getTitleFromUrl(text);
 			if (title) {
-				req.text = `${title} ${req.text}`;
+				text = `${title} ${text}`;
 			}
 		}
-		req.text = `${req.text} #inbox`;
+		text = `${text} #inbox`;
 
+		// タイムスタンプの追加
 		if (req.useTimestamp) {
-			// get current time in +0900 timezone with format like 12:34
 			const date = new Date();
 			date.setHours(date.getHours() + 9);
 			const timestamp = date.toTimeString().split(' ')[0].split(':').slice(0, 2).join(':');
-
-			req.text = `${timestamp} ${req.text}`;
+			text = `${timestamp} ${text}`;
 		}
+
+		// Workflowyの初期化
 		const initData = await init(sessionId);
 
-		const props: CreateBulletProps = {
+		// バレット作成に必要な情報をKVに保存
+		const bulletInfo = {
 			sessionId: sessionId,
 			parentId: parentId,
 			priority: 1000000,
-			text: req.text,
+			text: text,
 			description: req.note ?? '',
+			initDataJson: JSON.stringify(initData),
+			createdAt: Date.now(),
+		};
+
+		// KVに保存
+		await env.WORKFLOWY_DAILY_NOTES.put(KV_KEYS.PENDING_BULLET, JSON.stringify(bulletInfo));
+
+		// バレットの作成
+		await processPendingBullet(env);
+	} catch (err) {
+		console.error('Error processing request:', err);
+	}
+}
+
+// バックグラウンドでバレットを作成する関数
+async function processPendingBullet(env: Env) {
+	// KVからバレット情報を取得
+	const bulletInfoJson = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.PENDING_BULLET);
+	if (!bulletInfoJson) return;
+
+	try {
+		const bulletInfo = JSON.parse(bulletInfoJson);
+
+		// initDataをJSONから復元
+		const initData = JSON.parse(bulletInfo.initDataJson);
+
+		// CreateBulletPropsを作成
+		const props: CreateBulletProps = {
+			sessionId: bulletInfo.sessionId,
+			parentId: bulletInfo.parentId,
+			priority: bulletInfo.priority,
+			text: bulletInfo.text,
+			description: bulletInfo.description,
 			initData: initData,
 		};
+
+		// バレットを作成
 		await createBullet(props);
-		return new Response('Created bullet', { status: 200 });
-	} catch (err) {
-		if (err instanceof z.ZodError) {
-			return new Response(err.message, { status: 400 });
-		}
-		return new Response('Bad request', { status: 400 });
+
+		// 処理が完了したらKVから削除
+		await env.WORKFLOWY_DAILY_NOTES.delete(KV_KEYS.PENDING_BULLET);
+
+		console.log('Bullet created successfully in background');
+	} catch (error) {
+		console.error('Error creating bullet in background:', error);
+		// エラーが発生しても、KVからは削除しない
+		// 次回の実行時に再試行される可能性がある
 	}
 }

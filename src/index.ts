@@ -32,7 +32,7 @@ export interface Env {
 const KV_KEYS = {
 	TOKEN: 'token',
 	JOURNAL_ROOT_ID: 'journalRootId',
-	WEEKLY_NOTE_ID: 'weeklyNoteId',
+	DAILY_NOTE_ID: 'dailyNoteId',
 	SESSION_ID: 'sessionId',
 	PENDING_BULLET: 'pending_bullet', // 処理待ちのバレット情報
 };
@@ -62,17 +62,17 @@ export default {
 					return res;
 				}
 				return send(request, env, ctx);
-			case '/weekly':
+			case '/daily':
 				if (res !== null) {
-					return getWeeklyNote(env);
+					return getDailyNote(env);
 				}
-				return createWeeklyNote(env);
+				return createDailyNote(env);
 			default:
 				return new Response('Not found', { status: 404 });
 		}
 	},
 	async scheduled(event: Event, env: Env, ctx: ExecutionContext) {
-		ctx.waitUntil(createWeeklyNote(env));
+		ctx.waitUntil(createDailyNote(env));
 	},
 };
 
@@ -89,19 +89,19 @@ async function validatePostRequest(request: Request, env: Env) {
 	return null;
 }
 
-async function getWeeklyNote(env: Env) {
-	const weeklyNoteId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.WEEKLY_NOTE_ID);
-	if (weeklyNoteId === null) {
-		return new Response('Weekly note ID not found', { status: 404 });
+async function getDailyNote(env: Env) {
+	const dailyNoteId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.DAILY_NOTE_ID);
+	if (dailyNoteId === null) {
+		return new Response('Daily note ID not found', { status: 404 });
 	}
 
-	const weeklyNotePath = weeklyNoteId.split('-').pop();
-	const weeklyNoteURL = `https://workflowy.com/#/${weeklyNotePath}`;
+	const dailyNotePath = dailyNoteId.split('-').pop();
+	const dailyNoteURL = `https://workflowy.com/#/${dailyNotePath}`;
 
-	return new Response('', { status: 302, headers: { Location: weeklyNoteURL } });
+	return new Response('', { status: 302, headers: { Location: dailyNoteURL } });
 }
 
-async function createWeeklyNote(env: Env) {
+async function createDailyNote(env: Env) {
 	const sessionId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.SESSION_ID);
 	if (sessionId === null) {
 		return new Response('Session ID not found', { status: 403 });
@@ -114,24 +114,11 @@ async function createWeeklyNote(env: Env) {
 
 	const initData = await init(sessionId);
 
-	// Get current date (Monday) and next Sunday date in YYYY/MM/DD format
-	const currentDate = new Date();
-	// Format current date as YYYY/MM/DD
-	const currentDateFormatted = `${currentDate.getFullYear()}/${String(currentDate.getMonth() + 1).padStart(2, '0')}/${String(
-		currentDate.getDate()
-	).padStart(2, '0')}`;
-
-	// Calculate next Sunday (current date + days until next Sunday)
-	const nextSunday = new Date(currentDate);
-	const daysUntilSunday = 7 - currentDate.getDay();
-	nextSunday.setDate(currentDate.getDate() + daysUntilSunday);
-	// Format next Sunday as YYYY/MM/DD
-	const nextSundayFormatted = `${nextSunday.getFullYear()}/${String(nextSunday.getMonth() + 1).padStart(2, '0')}/${String(
-		nextSunday.getDate()
-	).padStart(2, '0')}`;
-
-	// Create the date range string
-	const dateString = `${currentDateFormatted}-${nextSundayFormatted} `;
+	// Get current date string (e.g. 2024-01-20)
+	const date = new Date();
+	date.setDate(date.getDate() + 1);
+	const dateStrings = date.toUTCString().split(' ');
+	const dateString = dateStrings[0] + ' ' + dateStrings[2] + ' ' + date.getUTCDate() + ', ' + dateStrings[3] + ' ';
 
 	const props: CreateBulletProps = {
 		sessionId: sessionId,
@@ -142,10 +129,10 @@ async function createWeeklyNote(env: Env) {
 		initData: initData,
 	};
 
-	const weeklyNoteBulletId = await createBullet(props);
-	await env.WORKFLOWY_DAILY_NOTES.put(KV_KEYS.WEEKLY_NOTE_ID, weeklyNoteBulletId);
+	const dailyNoteBulletId = await createBullet(props);
+	await env.WORKFLOWY_DAILY_NOTES.put(KV_KEYS.DAILY_NOTE_ID, dailyNoteBulletId);
 
-	return new Response('Created weekly note', { status: 200 });
+	return new Response('Created daily note', { status: 200 });
 }
 
 async function send(request: Request, env: Env, ctx: ExecutionContext) {
@@ -178,9 +165,9 @@ async function processRequest(reqBody: any, env: Env) {
 		}
 
 		// 親IDの取得
-		const parentId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.WEEKLY_NOTE_ID);
+		const parentId = await env.WORKFLOWY_DAILY_NOTES.get(KV_KEYS.DAILY_NOTE_ID);
 		if (parentId === null) {
-			console.error('Weekly note ID not found');
+			console.error('Daily note ID not found');
 			return;
 		}
 
